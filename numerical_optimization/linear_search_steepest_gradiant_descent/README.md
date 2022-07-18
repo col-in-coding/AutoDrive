@@ -16,9 +16,9 @@ $$
 $$
 $$
 =\begin{bmatrix} 100(4x_1^3-4x_2x_1)+2(x_1-1) \\
-2x_2-2x_1^2 \\
+200x_2-200x_1^2 \\
 100(4x_3^3-4x_4x_3)+2(x_3-1) \\
-2x_4-2x_3^2 \\
+200x_4-200x_3^2 \\
 ...\end{bmatrix}
 $$
 
@@ -39,3 +39,7 @@ $$
 ... & ... & ... & ... & ...
 \end{bmatrix}
 $$
+
+## Linear-search Steepest Gradiant Descent Solver
+
+### How to run the code: ` python ls_sgd_solver.py `
