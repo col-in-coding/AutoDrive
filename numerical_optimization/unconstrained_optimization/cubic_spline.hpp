@@ -190,7 +190,7 @@ namespace cubic_spline
                                   const Eigen::Vector2d &tailPos,
                                   const int &pieceNum)
         {
-           //TODO
+           // set x0(s0),x0(s1)...xn(s0),xn(s1) points
             headP = headPos;
             tailP = tailPos;
             N = pieceNum;

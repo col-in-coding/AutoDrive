@@ -1,5 +1,14 @@
 # autodrive
 
+## Setup Eigen
+### 1. Download source code
+```
+git clone https://gitlab.com/libeigen/eigen.git
+```
+### 2. Include the directory
+```
+include_directories(/path/to/eigen)
+```
 
 ## Setup OSQP
 ### 1. Download source code
