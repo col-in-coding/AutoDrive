@@ -189,17 +189,32 @@ namespace cubic_spline
 
         std::unique_ptr<CubicCurve> curve_;
         const int duration_ = 2;
-        // Eigen::MatrixXd *tmpA_;
+        Eigen::MatrixXd tmpA_;
 
     public:
         inline void setConditions(const Eigen::Vector2d &headPos,
                                   const Eigen::Vector2d &tailPos,
                                   const int &pieceNum)
         {
-           // set x0(s0),x0(s1)...xn(s0),xn(s1) points
+            // set x0(s0),x0(s1)...xn(s0),xn(s1) points
             headP = headPos;
             tailP = tailPos;
             N = pieceNum;
+            // init tmpA matrix
+            tmpA_.resize(N, N);
+            for (size_t i = 0; i < N; i++)
+            {
+                tmpA_.row(i) = Eigen::VectorXd(N);
+                if (i != 0)
+                {
+                    tmpA_(i, i - 1) = 1;
+                }
+                tmpA_(i, i) = 4;
+                if (i != N - 1)
+                {
+                    tmpA_(i, i + 1) = 1;
+                }
+            }
             return;
         }
 
@@ -267,27 +282,15 @@ namespace cubic_spline
             return b;
         }
 
-        inline void getGrad(Eigen::Ref<Eigen::Matrix2Xd> gradByPoints) const
+        // inline void getGrad(Eigen::Ref<Eigen::Matrix2Xd> gradByPoints) const
+        inline void getGrad(Eigen::Ref<Eigen::Matrix2Xd> gradByPoints)
         {
             //TODO
             Eigen::VectorXd X(2 * (N + 1));
             std::cout << "X: " << X << std::endl;
 
             // dD/dX = inverse(A) @ dB/dX
-            Eigen::MatrixXd tmpA(N, N);
-            for (size_t i = 0; i < N; i++)
-            {
-                if (i != 0)
-                {
-                    tmpA(i, i - 1) = 1;
-                }
-                tmpA(i, i) = 4;
-                if (i != N - 1)
-                {
-                    tmpA(i, i + 1) = 1;
-                }
-            }
-            std::cout << "tmpA" << tmpA << std::endl;
+            std::cout << "tmpA" << tmpA_ << std::endl;
 
             /*
             int i = 0;
