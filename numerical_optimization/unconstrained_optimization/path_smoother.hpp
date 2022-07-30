@@ -18,6 +18,7 @@ namespace path_smoother
     {
     private:
         cubic_spline::CubicSpline cubSpline;
+        const int maxItr_ = 3000;
 
         int pieceN;
         Eigen::Matrix3Xd diskObstacles;
@@ -64,7 +65,31 @@ namespace path_smoother
                                const Eigen::Matrix2Xd &iniInPs,
                                const double &relCostTol)
         {
-          //TODO
+            // init curve
+            cubSpline.setInnerPoints(iniInPs);
+            cubSpline.getCurve(curve);
+            
+            // int c = 0.5;
+            // double cost;
+
+            // for (size_t i = 0; i < maxItr_; i++)
+            // {
+
+            double energy;
+            cubSpline.getStretchEnergy(energy);
+            std::cout << "energy: " << energy << std::endl;
+
+            cubSpline.getGrad(gradByPoints);
+            std::cout << "grad: " << gradByPoints << std::endl;
+
+            // Amijo condition
+            int tau = 1;
+
+            // cost = costFunction()
+
+            // }
+
+
             double minCost = INFINITY;
             return minCost;
         }

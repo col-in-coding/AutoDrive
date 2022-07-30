@@ -7,6 +7,8 @@
 
 #include <cmath>
 #include <vector>
+#include <memory>
+#include <iostream>
 
 namespace cubic_spline
 {
@@ -185,6 +187,10 @@ namespace cubic_spline
         BandedSystem A;
         Eigen::MatrixX2d b;
 
+        std::unique_ptr<CubicCurve> curve_;
+        const int duration_ = 2;
+        // Eigen::MatrixXd *tmpA_;
+
     public:
         inline void setConditions(const Eigen::Vector2d &headPos,
                                   const Eigen::Vector2d &tailPos,
@@ -199,19 +205,60 @@ namespace cubic_spline
 
         inline void setInnerPoints(const Eigen::Ref<const Eigen::Matrix2Xd> &inPs)
         {
-          //TODO
+            // Init curve
+            std::vector<double> durs;
+            std::vector<Eigen::Matrix<double, 2, 4>> cMats;
+            cMats.resize(N);
+
+            Eigen::Vector2d p_s0 = headP;
+            Eigen::Vector2d p_s1 = inPs.col(0);
+            cMats[0] << 0.0, 0.0, p_s1(0) - headP(0), headP(0),
+                        0.0, 0.0, p_s1(1) - headP(1), headP(1);
+            durs.emplace_back(duration_);
+
+            for (size_t i = 1; i < N - 1; i++)
+            {
+                p_s0 = p_s1;
+                p_s1 = inPs.col(0);
+
+                cMats[i] << 0.0, 0.0, p_s1(0) - p_s0(0), p_s0(0),
+                            0.0, 0.0, p_s1(1) - p_s0(1), p_s0(1);
+                durs.emplace_back(duration_);
+            }
+
+            p_s0 = p_s1;
+
+            cMats[N-1] << 0.0, 0.0, tailP(0) - p_s0(0), p_s0(0),
+                          0.0, 0.0, tailP(1) - p_s0(1), p_s0(1);
+            durs.emplace_back(duration_);
+
+            curve_ = std::make_unique<CubicCurve>(durs, cMats);
             return;
         }
 
         inline void getCurve(CubicCurve &curve) const
         {
-          //TODO
-           return;
+            //TODO
+            curve = *curve_.get();
+            return;
         }
 
         inline void getStretchEnergy(double &energy) const
         {
-           //TODO
+            //TODO
+            energy = 0;
+            for (size_t i = 0; i < curve_->getPieceNum(); i++)
+            {
+                auto piece = (*curve_)[i];
+                Eigen::Matrix<double, 2, 4> coeffMat = piece.getCoeffMat();
+                std::cout << coeffMat << std::endl;
+
+                double ci_x = coeffMat(1, 0);
+                double ci_y = coeffMat(1, 1);
+                double di_x = coeffMat(0, 0);
+                double di_y = coeffMat(0, 1);
+                energy += 4 * (ci_x*ci_x + ci_y*ci_y) + 12 * (ci_x*di_x + ci_y*di_y) + 12 * (di_x*di_x + di_y*di_y);
+            }
             return;
         }
 
@@ -223,6 +270,43 @@ namespace cubic_spline
         inline void getGrad(Eigen::Ref<Eigen::Matrix2Xd> gradByPoints) const
         {
             //TODO
+            Eigen::VectorXd X(2 * (N + 1));
+            std::cout << "X: " << X << std::endl;
+
+            // dD/dX = inverse(A) @ dB/dX
+            Eigen::MatrixXd tmpA(N, N);
+            for (size_t i = 0; i < N; i++)
+            {
+                if (i != 0)
+                {
+                    tmpA(i, i - 1) = 1;
+                }
+                tmpA(i, i) = 4;
+                if (i != N - 1)
+                {
+                    tmpA(i, i + 1) = 1;
+                }
+            }
+            std::cout << "tmpA" << tmpA << std::endl;
+
+            /*
+            int i = 0;
+            // dEi/dX = partialX @ cf
+            auto piece = (*curve_)[i];
+            Eigen::Matrix<double, 2, 4> coeffMat = piece.getCoeffMat();
+            // cf = [8xci, 8yci, 12xci, 12yci, 12xdi, 12ydi, 24xdi, 24ydi]
+            Eigen::VectorXd cf;
+            cf << 8 * coeffMat(0, 1), 8 * coeffMat(1, 1),
+                  12 * coeffMat(0, 1), 12 * coeffMat(1, 1),
+                  12 * coeffMat(0, 0), 12 * coeffMat(1, 0),
+                  24 * coeffMat(0, 0), 12 * coeffMat(1, 0);
+            // partialX = [dxci/dX, dyci/dX, dxdi/dX, dydi/dX, dxci/dX, dyci/dX, dxdi/dX, dydi/dX]
+            // dxci/dX = 3d(x_{i+1} - x_i)/dX + 2 dDi/dX + dD_{i+1}/dX
+            */
+
+
+
+
         }
     };
 }
