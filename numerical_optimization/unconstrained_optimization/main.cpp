@@ -5,8 +5,8 @@
 int main(int argc, char const *argv[])
 {
     Eigen::Vector2d initialP {0, 0};
-    Eigen::Vector2d terminalP {2, 0};
-    int N {2};
+    Eigen::Vector2d terminalP {3, 0};
+    int N {3};
     double relCostTol {1.0e-6};
     Eigen::Matrix2Xd innerPoints(2, N - 1);
     for (int i = 0; i < N - 1; ++i)
@@ -20,7 +20,7 @@ int main(int argc, char const *argv[])
 
     // (x, y, r)
     Eigen::Matrix3Xd circleObs(3,1);
-    circleObs << 1, 0, 1;
+    circleObs << 0.9, 0, 0.5;
 
     double penaltyWeight {100};
 

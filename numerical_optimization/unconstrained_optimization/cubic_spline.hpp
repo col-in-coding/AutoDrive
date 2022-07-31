@@ -189,7 +189,10 @@ namespace cubic_spline
 
         std::unique_ptr<CubicCurve> curve_;
         const int duration_ = 2;
-        Eigen::MatrixXd tmpA_;
+        // derivative from D1 to D_{N-1}
+        Eigen::MatrixXd dDdX_;
+        // 3 * d(x_{i+1} - x_i)/dX
+        Eigen::MatrixXd tmpM_;
 
     public:
         inline void setConditions(const Eigen::Vector2d &headPos,
@@ -200,21 +203,40 @@ namespace cubic_spline
             headP = headPos;
             tailP = tailPos;
             N = pieceNum;
-            // init tmpA matrix
-            tmpA_.resize(N, N);
-            for (size_t i = 0; i < N; i++)
+
+            // dD/dX = inverse(tmpA) @ dB/dX
+            Eigen::MatrixXd tmpA;
+            Eigen::MatrixXd dBdX;
+            tmpA.resize(N-1, N-1);
+            dBdX.resize(N-1, N-1);
+            // tmpM = 3 * d(x_i - x_{i+1})/dX
+            tmpM_.resize(N, N-1);
+            for (size_t i = 0; i < N - 1; i++)
             {
-                tmpA_.row(i) = Eigen::VectorXd(N);
+                tmpA.row(i) = Eigen::VectorXd(N-1);
+                dBdX.row(i) = Eigen::VectorXd(N-1);
                 if (i != 0)
                 {
-                    tmpA_(i, i - 1) = 1;
+                    tmpA(i, i - 1) = 1;
+                    dBdX(i, i - 1) = -3;
+                    tmpM_(i, i - 1) = 3;
                 }
-                tmpA_(i, i) = 4;
-                if (i != N - 1)
+                tmpA(i, i) = 4;
+                tmpM_(i, i) = -3;
+                if (i != N - 2)
                 {
-                    tmpA_(i, i + 1) = 1;
+                    tmpA(i, i + 1) = 1;
+                    dBdX(i, i + 1) = 3;
                 }
             }
+            tmpM_(N-1, N-2) = 3;
+
+            // std::cout << "tmpA: \n" << tmpA << std::endl;
+            // std::cout << "dBdX: \n" << dBdX << std::endl;
+
+            dDdX_ = tmpA.inverse() * dBdX;
+            // std::cout << "dDdX_: \n" << dDdX_ << std::endl;
+            // std::cout << "tmpM_: \n" << tmpM_ << std::endl;
             return;
         }
 
@@ -234,7 +256,7 @@ namespace cubic_spline
             for (size_t i = 1; i < N - 1; i++)
             {
                 p_s0 = p_s1;
-                p_s1 = inPs.col(0);
+                p_s1 = inPs.col(i);
 
                 cMats[i] << 0.0, 0.0, p_s1(0) - p_s0(0), p_s0(0),
                             0.0, 0.0, p_s1(1) - p_s0(1), p_s0(1);
@@ -266,7 +288,7 @@ namespace cubic_spline
             {
                 auto piece = (*curve_)[i];
                 Eigen::Matrix<double, 2, 4> coeffMat = piece.getCoeffMat();
-                std::cout << coeffMat << std::endl;
+                // std::cout << "coeffMat: \n" << coeffMat << std::endl;
 
                 double ci_x = coeffMat(1, 0);
                 double ci_y = coeffMat(1, 1);
@@ -286,30 +308,64 @@ namespace cubic_spline
         inline void getGrad(Eigen::Ref<Eigen::Matrix2Xd> gradByPoints)
         {
             //TODO
-            Eigen::VectorXd X(2 * (N + 1));
-            std::cout << "X: " << X << std::endl;
+            Eigen::Matrix2Xd grad(2, N-1);
+            Eigen::Matrix2Xd dEidX(2, N-1);
+            gradByPoints = Eigen::Matrix2Xd::Zero(2, N-1);
 
-            // dD/dX = inverse(A) @ dB/dX
-            std::cout << "tmpA" << tmpA_ << std::endl;
+            // dEi/dX = cf @ partialX
+            for (size_t i = 0; i < N; i++)
+            {
+                // size_t i = 2;
+                // get coeffMat of curve i
+                auto piece = (*curve_)[i];
+                Eigen::Matrix<double, 2, 4> coeffMat = piece.getCoeffMat();
+                // std::cout << "cMat: " << coeffMat << std::endl;
+                // cf = [8ci, 12ci, 12di, 24di]
+                Eigen::MatrixXd cf_x(1, 4);
+                Eigen::MatrixXd cf_y(1, 4);
+                cf_x << 8 * coeffMat(0, 1), 12 * coeffMat(0, 1), 12 * coeffMat(0, 0), 24 * coeffMat(0, 0);
+                cf_y << 8 * coeffMat(1, 1), 12 * coeffMat(1, 1), 12 * coeffMat(1, 0), 24 * coeffMat(1, 0);
+                // std::cout << "cf_x: \n" << cf_x << std::endl;
 
-            /*
-            int i = 0;
-            // dEi/dX = partialX @ cf
-            auto piece = (*curve_)[i];
-            Eigen::Matrix<double, 2, 4> coeffMat = piece.getCoeffMat();
-            // cf = [8xci, 8yci, 12xci, 12yci, 12xdi, 12ydi, 24xdi, 24ydi]
-            Eigen::VectorXd cf;
-            cf << 8 * coeffMat(0, 1), 8 * coeffMat(1, 1),
-                  12 * coeffMat(0, 1), 12 * coeffMat(1, 1),
-                  12 * coeffMat(0, 0), 12 * coeffMat(1, 0),
-                  24 * coeffMat(0, 0), 12 * coeffMat(1, 0);
-            // partialX = [dxci/dX, dyci/dX, dxdi/dX, dydi/dX, dxci/dX, dyci/dX, dxdi/dX, dydi/dX]
-            // dxci/dX = 3d(x_{i+1} - x_i)/dX + 2 dDi/dX + dD_{i+1}/dX
-            */
+                // partialX_mat = [dci/dX, ddi/dX, dci/dX, ddi/dX]^T
+                // j = i+1
+                // dci/dX = 3 d(x_j - x_i)/dX + 2 dDi/dX + dD_j/dX
+                Eigen::VectorXd dcidX;
+                Eigen::VectorXd dcidX_part1 = -tmpM_.row(i);
 
+                Eigen::VectorXd dDidX(N-1);
+                Eigen::VectorXd dDjdX(N-1);
 
+                if (i != 0)
+                {
+                    dDidX = dDdX_.row(i - 1);
+                }
+                if (i != N - 1){
+                    dDjdX = dDdX_.row(i);
+                }
+                dcidX = dcidX_part1 - 2 * dDidX - dDjdX;
+                // std::cout << "dcidX: \n" << dcidX << std::endl;
 
+                // ddi/dX = 2 d(x_i - x_j)/dX + dDi/dX + dD_j/dX
+                Eigen::VectorXd ddidX;
+                Eigen::VectorXd ddidX_part1 = tmpM_.row(i);
 
+                ddidX = ddidX_part1 + dDidX + dDjdX;
+                // std::cout << "ddidX: \n" << ddidX << std::endl;
+
+                Eigen::MatrixXd partialX_mat(4, N-1);
+                partialX_mat.row(0) = dcidX;
+                partialX_mat.row(1) = ddidX;
+                partialX_mat.row(2) = dcidX;
+                partialX_mat.row(3) = ddidX;
+                // std::cout << "partialX_mat: \n" << partialX_mat << std::endl;
+
+                grad.row(0) = cf_x * partialX_mat;
+                grad.row(1) = cf_y * partialX_mat;
+                
+                // std::cout << "grad: \n" << grad << std::endl;
+                gradByPoints = gradByPoints + grad;
+            }
         }
     };
 }

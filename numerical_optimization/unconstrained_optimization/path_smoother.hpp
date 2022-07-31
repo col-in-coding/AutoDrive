@@ -10,6 +10,7 @@
 #include <cfloat>
 #include <iostream>
 #include <vector>
+#include <algorithm>
 
 namespace path_smoother
 {
@@ -75,17 +76,45 @@ namespace path_smoother
             // for (size_t i = 0; i < maxItr_; i++)
             // {
 
-            double energy;
-            cubSpline.getStretchEnergy(energy);
-            std::cout << "energy: " << energy << std::endl;
-
             cubSpline.getGrad(gradByPoints);
-            std::cout << "grad: " << gradByPoints << std::endl;
+            std::cout << "gradByPoints: \n" << gradByPoints << std::endl;
+
+            // f(x) = stretchEnergy + potential
+            double energy;
+            double potential;
+            cubSpline.getStretchEnergy(energy);
+            // std::cout << "energy: " << energy << std::endl;
+            for (size_t j = 0; j < diskObstacles.cols(); j++)
+            {
+                // for j-th obstable
+                Eigen::VectorXd obstacle = diskObstacles.col(j);
+                Eigen::Matrix2Xd grad(2, pieceN-1);
+                for (size_t k = 0; k < pieceN - 1; k++)
+                {
+                    // for k-th inner point
+                    double ox = obstacle[0];
+                    double oy = obstacle[1];
+                    double r = obstacle[2];
+                    double x = iniInPs(0, k);
+                    double y = iniInPs(1, k);
+                    double dist = std::sqrt((ox - x)*(ox - x) + (oy - y)*(ox - y));
+                    std::cout << "dist: " << dist << std::endl;
+                    if (dist < r)
+                    {
+                        potential += penaltyWeight * (r - dist);
+                        grad(0, k) = penaltyWeight * (ox - x) / (dist + 1e-6);
+                        grad(1, k) = penaltyWeight * (oy - y) / (dist + 1e-6);
+                    }
+                }
+                std::cout << "potential grad: \n" << grad << std::endl;
+                gradByPoints = gradByPoints + grad;
+            }
+            double fx = energy + potential;
 
             // Amijo condition
             int tau = 1;
 
-            // cost = costFunction()
+            // double cost = costFunction();
 
             // }
 
