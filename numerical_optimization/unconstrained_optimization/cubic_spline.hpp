@@ -193,6 +193,7 @@ namespace cubic_spline
         Eigen::MatrixXd dDdX_;
         // 3 * d(x_{i+1} - x_i)/dX
         Eigen::MatrixXd tmpM_;
+        Eigen::MatrixXd tmpA_inverse_;
 
     public:
         inline void setConditions(const Eigen::Vector2d &headPos,
@@ -233,8 +234,8 @@ namespace cubic_spline
 
             // std::cout << "tmpA: \n" << tmpA << std::endl;
             // std::cout << "dBdX: \n" << dBdX << std::endl;
-
-            dDdX_ = tmpA.inverse() * dBdX;
+            tmpA_inverse_ = tmpA.inverse();
+            dDdX_ = tmpA_inverse_ * dBdX;
             // std::cout << "dDdX_: \n" << dDdX_ << std::endl;
             // std::cout << "tmpM_: \n" << tmpM_ << std::endl;
             return;
@@ -242,32 +243,100 @@ namespace cubic_spline
 
         inline void setInnerPoints(const Eigen::Ref<const Eigen::Matrix2Xd> &inPs)
         {
+            std::cout << "inPs: \n" << inPs << std::endl;
             // Init curve
             std::vector<double> durs;
             std::vector<Eigen::Matrix<double, 2, 4>> cMats;
             cMats.resize(N);
 
-            Eigen::Vector2d p_s0 = headP;
-            Eigen::Vector2d p_s1 = inPs.col(0);
-            cMats[0] << 0.0, 0.0, p_s1(0) - headP(0), headP(0),
-                        0.0, 0.0, p_s1(1) - headP(1), headP(1);
-            durs.emplace_back(duration_);
+            double xi, xi_next, xai, xbi, xbi_next, xci, xdi;
+            double yi, yi_next, yai, ybi, ybi_next, yci, ydi;
 
-            for (size_t i = 1; i < N - 1; i++)
+            // B = 3[x2 - x0, x3 - x1, x4 - x2 ..., xi2 - xi]
+            // X = [x0, x1, ... xn], n = N + 1
+            Eigen::VectorXd Bx(N-1);
+            Eigen::VectorXd By(N-1);
+            Eigen::VectorXd X(N + 1);
+            Eigen::VectorXd Y(N + 1);
+            for (size_t i = 0; i < N - 1; i++)
             {
-                p_s0 = p_s1;
-                p_s1 = inPs.col(i);
-
-                cMats[i] << 0.0, 0.0, p_s1(0) - p_s0(0), p_s0(0),
-                            0.0, 0.0, p_s1(1) - p_s0(1), p_s0(1);
-                durs.emplace_back(duration_);
+                if (i == 0) {
+                    X(i) = headP(0);
+                    Y(i) = headP(1);
+                } else {
+                    X(i) = inPs(0, i - 1);
+                    Y(i) = inPs(1, i - 1);
+                }
+                double xi2, yi2;   
+                if (i == N - 2)
+                {
+                    X(i + 2) = tailP(0);
+                    X(i + 2) = tailP(1);
+                } else {
+                    X(i + 2) = inPs(0, i + 1);
+                    Y(i + 2) = inPs(1, i + 1);
+                }
+                Bx(i) = 3.0 * (xi2 - xi);
+                By(i) = 3.0 * (yi2 - yi);
             }
+            // std::cout << "Bx: " << Bx << std::endl;
+            // std::cout << "By: " << By << std::endl;
+            /*
+            // D = A^{-1}B
+            Eigen::MatrixXd Dx = tmpA_inverse_ * Bx;
+            Eigen::MatrixXd Dy = tmpA_inverse_ * By;
+            // std::cout << "Dx: " << Dx << std::endl;
+            // std::cout << "Dy: " << Dy << std::endl;
 
-            p_s0 = p_s1;
+            // cMat = [di, ci, bi, ai]
+            for (size_t i = 0; i < N; i++)
+            {
+                // xi, yi, Di = bi
+                if (i == 0) {
+                    xi = headP(0);
+                    yi = headP(1);
+                } else {
+                    xi = inPs(0, i - 1);
+                    yi = inPs(1, i - 1);
+                }
+                // Di = bi
+                if (i == 0)
+                {
+                    xbi = 0;
+                    ybi = 0;
+                }
 
-            cMats[N-1] << 0.0, 0.0, tailP(0) - p_s0(0), p_s0(0),
-                          0.0, 0.0, tailP(1) - p_s0(1), p_s0(1);
-            durs.emplace_back(duration_);
+                xi_next = inPs(0, i);
+                yi_next = inPs(1, i);
+                xai = xi;
+                yai = yi;
+
+                if (i == 0) {
+                } 
+            }
+            */
+
+            // Eigen::Vector2d p_s0 = headP;
+            // Eigen::Vector2d p_s1 = inPs.col(0);
+            // cMats[0] << 0.0, 0.0, p_s1(0) - headP(0), headP(0),
+            //             0.0, 0.0, p_s1(1) - headP(1), headP(1);
+            // durs.emplace_back(duration_);
+
+            // for (size_t i = 1; i < N - 1; i++)
+            // {
+            //     p_s0 = p_s1;
+            //     p_s1 = inPs.col(i);
+
+            //     cMats[i] << 0.0, 0.0, p_s1(0) - p_s0(0), p_s0(0),
+            //                 0.0, 0.0, p_s1(1) - p_s0(1), p_s0(1);
+            //     durs.emplace_back(duration_);
+            // }
+
+            // p_s0 = p_s1;
+
+            // cMats[N-1] << 0.0, 0.0, tailP(0) - p_s0(0), p_s0(0),
+            //               0.0, 0.0, tailP(1) - p_s0(1), p_s0(1);
+            // durs.emplace_back(duration_);
 
             curve_ = std::make_unique<CubicCurve>(durs, cMats);
             return;
